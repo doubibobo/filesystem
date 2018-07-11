@@ -266,7 +266,7 @@ __u16 get_one_free_block_bitmap()
 {
     // 首先获取块位图的开始
     __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH;
-    int current = first_begin;
+    __u32 current = first_begin;
     if ((disk = fopen(DISK, "r+")) == NULL)
     {
         fseek(disk, current, SEEK_SET);
@@ -284,8 +284,8 @@ __u16 get_one_free_block_bitmap()
                     ++current;
                 }
                 // 找到第一个空闲数据块
-                printf("找到第一个空闲数据块");
-                return current-first_begin;
+                printf("找到第一个空闲数据块，编号为%d\n", current - first_begin);
+                return current - first_begin;
             }
         }
         printf("获取数据块失败，当前已经没有数据块可用！\n");
@@ -305,7 +305,7 @@ BOOL set_one_bit_of_block_bitmap(int offset, int value, int number)
         return IS_FALSE;
     }
     // 首先获取块位图的开始
-    __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH;
+    __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH + BLOCK_INDEX_BMP_SIZE*number;
     __u32 current = first_begin + offset;
     // 打开文件以取出一位
     if ((disk = fopen(DISK, "r+")) == NULL) 
@@ -354,13 +354,86 @@ BOOL set_one_bit_of_block_bitmap(int offset, int value, int number)
 // 获取第一个空闲inode
 __u16 get_one_free_index_bitmap()
 {
-
+    // 首先获取索引位图的开始
+    __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH + BIT_MAP_SIZE;
+    __u32 current = first_begin;
+    if ((disk = fopen(DISK, "r+")) == NULL)
+    {
+        fseek(disk, current, SEEK_SET);
+        for (; current < INDEX_MAP_SIZE*8; )
+        {
+            __u8 current_char = fgetc(disk);
+            if (current_char == 255)
+            {
+                current += 8;
+            } else 
+            {
+                while (current_char & 0x80)
+                {
+                    current_char = current_char << 1;
+                    ++current;
+                }
+                // 找到第一个空闲数据块
+                printf("找到第一个空闲inode，编号为%d\n", current - first_begin);
+                return current - first_begin;
+            }
+        }
+        printf("获取索引节点失败，当前已经没有inode节点可用\n");
+        return 0;
+    }
+    printf("获取索引节点失败！\n");
+    return 0;
 }
 
 // 设置索引位图中的某一位
-BOOL set_one_bit_of_index_bitmap(int where)
+BOOL set_one_bit_of_index_bitmap(int offset, int value, int number)
 {
-
+    // 检查偏移量
+    if (offset >= INDEX_MAP_SIZE)
+    {
+        printf("索引位图操作越界！\n");
+        return IS_FALSE;
+    }
+    // 首先获取索引位图的开始
+    __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH + BIT_MAP_SIZE + BLOCK_INDEX_BMP_SIZE*number;
+    __u32 current = first_begin + offset;
+    // 打开文件取出当中的某一位
+    if ((disk = fopen(DISK, "r+")) == NULL)
+    {
+        fseek(disk, current, SEEK_SET);             // 从初始位置开始
+        __u8 current_char = fgetc(disk);
+        __u8 current_bit = current_char & 0x80;
+        if (value && current_bit == 0)
+        {
+            current_char = current_char | 0x80;
+        } else if (value == 0 || current_bit)
+        {
+            current_char = current_char & 0x7F;
+        } else
+        {
+            printf("索引位图（索引位图）操作失败");
+            fclose(disk);
+            return IS_FALSE;
+        }
+        
+        // 向磁盘块写入一个字节的内容
+        // 由于刚刚读出一个字符的时候，读写指针已经移动，所以要重新寻找相关地址
+        fseek(disk, current, SEEK_SET);
+        if (fputc(current_char, disk) != EOF)
+        {
+            printf("设置索引位图成功！\n");
+            // 修改超级块、组描述符中的空闲节点信息
+            super_block.s_free_inodes_count--;
+            group_desc_table.every[number].bg_free_inodes_count--;
+            fclose(disk);
+            return IS_TRUE;
+        } else 
+        {
+            printf("设置索引位图失败！\n");
+            fclose(disk);
+            return IS_FALSE;
+        }
+    }
 }
 
 // 外存inode节点初始化，创建根目录以及root目录
@@ -390,7 +463,7 @@ BOOL out_inode_table_init()
     // 这是第一个inode节点，讲其编号为1，注意，inode节点编号为0的不用
 
     // 开始设置位图：将使用的数据块以及inode节点置位已使用状态
-
+    
 
     return IS_TRUE;
 }

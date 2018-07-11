@@ -65,6 +65,8 @@
 #define GROUP_NUMBER 8
 // 定义每一组含有的块数
 #define BOLOCKS_OF_EVERY_GROUP 1024
+// 定义一个组的块位图和索引节点位图的大小
+#define BLOCK_INDEX_BMP_SIZE 128
 
 // 定义组描述表项大小
 #define GROUP_DESC_SIZE 32
