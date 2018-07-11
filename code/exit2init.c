@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <time.h>
+
 #include "dataType.h"
 #include "diskStruct.h"
 
@@ -10,14 +12,17 @@ FILE *disk;
 // 超级块定义
 struct ext2_super_block super_block;
 
-// 组描述符定义
+// 组描述符表项目定义
 struct ext2_group_desc group_init;
 
-// 描述符表项
+// 描述符表
 struct ext2_group_desc_table group_desc_table;
 
 // 块位图初始化定义
 struct ext2_bit_map bit_map;
+
+// 根节点初始化定义
+struct ext2_out_inode root_disk;
 
 // 引导块初始化
 BOOL home_block_init()
@@ -127,8 +132,6 @@ BOOL other_group_super_block_init()
     }
 }
 
-
-
 // 对块组0的组块描述表初始化
 BOOL group_desc_init()
 {
@@ -210,7 +213,7 @@ BOOL block_bitmap_init()
     } else 
     {
         int i, j;
-        char pad1 = 255, pad2 = 240;
+        char pad1 = 255, pad2 = 248;
         for (i = 0; i < 16; i++)
         {
             bit_map.first[i] = pad1;
@@ -241,7 +244,9 @@ BOOL index_bitmap_init()
     {
         char index_bit[1024];
         int i;
-        for (i = 0; i < 1024; i++)
+        // 设置0号inode节点不使用
+        index_bit[0] = 0x80;
+        for (i = 1; i < 1024; i++)
         {
             index_bit[i] = 0;
         }
@@ -251,14 +256,143 @@ BOOL index_bitmap_init()
             fwrite(&index_bit, sizeof(index_bit), 1, disk);
         }
         printf("索引位图（逻辑位图）初始化成功！\n");
+        fclose(disk);
         return IS_TRUE;
     }
 }
 
-// 外存inode节点初始化
-void out_inode_table_init()
+// 采用整块的分配方式，获取第一个空闲数据块的编号，注意空闲数据块从0开始编号，返回空闲块的块号
+__u16 get_one_free_block_bitmap()
+{
+    // 首先获取块位图的开始
+    __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH;
+    int current = first_begin;
+    if ((disk = fopen(DISK, "r+")) == NULL)
+    {
+        fseek(disk, current, SEEK_SET);
+        for (; current < BIT_MAP_SIZE*8;)
+        {
+            __u8 current_char = fgetc(disk);
+            if (current_char == 255)
+            {
+                current += 8;
+            } else 
+            {
+                while (current_char & 0x80)
+                {
+                    current_char = current_char << 1;
+                    ++current;
+                }
+                // 找到第一个空闲数据块
+                printf("找到第一个空闲数据块");
+                return current-first_begin;
+            }
+        }
+        printf("获取数据块失败，当前已经没有数据块可用！\n");
+        return 0;
+    }
+    printf("获取数据块失败！\n");
+    return 0;
+}
+
+// 设置块位图当中的某一位，默认为0号组，默认偏移量为0，即从开始处进行写
+BOOL set_one_bit_of_block_bitmap(int offset, int value, int number)
+{
+    // 检查偏移量
+    if (offset >= BIT_MAP_SIZE)
+    {
+        printf("位图越界！\n");
+        return IS_FALSE;
+    }
+    // 首先获取块位图的开始
+    __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH;
+    __u32 current = first_begin + offset;
+    // 打开文件以取出一位
+    if ((disk = fopen(DISK, "r+")) == NULL) 
+    {
+        fseek(disk, current, SEEK_SET);             // 从初始位置开始偏移
+        __u8 current_char = fgetc(disk);
+        __u8 current_bit = current_char & 0x80;
+        if (value && current_bit == 0) 
+        {
+            // 如果value的值为1且当前的位标志为0，则讲其进行置位操作
+            current_char = current_char | 0x80;
+        } else if (value == 0 && current_bit)
+        {
+            // 如果value的值为0且当前的位标志为1，则将其进行置位操作
+            current_char = current_char & 0x7F;
+        } else
+        {
+            // 上述两种情况都不满足，出现错误
+            printf("块（物理块位图）操作失败！\n");
+            fclose(disk);
+            return IS_FALSE;
+        }
+        // 向磁盘块写入一个字节的内容
+        // 由于刚刚读出一个字符的时候，读写指针已经移动，所以要重新寻找相关地址
+        fseek(disk, current, SEEK_SET);
+        if (fputc(current_char, disk) != EOF)
+        {
+            printf("设置块位图成功！\n");
+            // 修改超级块、组描述符中的空闲节点信息
+            super_block.s_free_blocks_count--;
+            group_desc_table.every[number].bg_free_blocks_count--;
+            fclose(disk);
+            return IS_TRUE;
+        } else 
+        {
+            printf("设置块位图失败！\n");
+            fclose(disk);
+            return IS_FALSE;
+        }
+    }
+    printf("块位图操作失败！\n");
+    fclose(disk);
+    return IS_FALSE;
+}
+
+// 获取第一个空闲inode
+__u16 get_one_free_index_bitmap()
 {
 
+}
+
+// 设置索引位图中的某一位
+BOOL set_one_bit_of_index_bitmap(int where)
+{
+
+}
+
+// 外存inode节点初始化，创建根目录以及root目录
+BOOL out_inode_table_init()
+{
+    // 定义根目录的权限
+    __u16 permit = 0x1111;
+    root_disk.i_type = DIR_FILE;
+    root_disk.i_mode = permit;
+    root_disk.i_uid = 0;                // 文件拥有者0
+    
+    // 获取当前时间戳
+    __u32 current_time;
+    time_t t = time(NULL);
+    current_time = time(&t);
+    root_disk.i_atime = current_time;
+    root_disk.i_ctime = current_time;
+    root_disk.i_mtime = current_time;
+    root_disk.i_dtime = 0xFFFF;
+
+    root_disk.i_gid = 0;                        // 文件用户组标识符
+    root_disk.i_links_count = 1;                // 硬链接计数，初始值为0
+    root_disk.i_blocks = 1;                     // 文件所占块数，初始化为1
+    root_disk.i_flags = 3;                      // 设置文件打开方式为读写
+    root_disk.i_block[0] = FIRST_DATA_BLOCK;    // 设置文件系统的第一个数据块
+
+    // 这是第一个inode节点，讲其编号为1，注意，inode节点编号为0的不用
+
+    // 开始设置位图：将使用的数据块以及inode节点置位已使用状态
+
+
+    return IS_TRUE;
 }
 
 // 文件系统初始化函数
@@ -299,8 +433,11 @@ void ext2_init()
     {
         printf("索引位图初始化成功！\n");
     }
-    // 索引表初始化
-    out_inode_table_init();
+    // 索引表初始化，创建/(根目录)和/root（root目录）
+    if (out_inode_table_init())
+    {
+        printf("创建根目录成功！\n");
+    }
 }
 
 // 硬盘检查,以只读方式打开

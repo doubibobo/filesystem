@@ -9,23 +9,23 @@
 // 硬盘设置
 #define DISK "/home/doubibobo/ext2/ext2"
 // 文件系统的状态
-#define EXT2_VALID_FS 0X0001      // 文件系统没有出错
+#define EXT2_VALID_FS 0x0001      // 文件系统没有出错
 #define EXT2_ERROR_FS 0x0002      // 内核检测到错误
 // inode节点指向设置，默认为9个直接地址，1个间接地址
 // 间接规定一个文件大小的最大值为9k + 256k
 #define EXT2_N_BLOCKS 10 
 
 // 定义文件类型
-#define ORDINARY_FILE 1
-#define DIR_FILE = 2
-#define BLOCK_FILE = 4
-#define CHAR_FILE = 8
-#define SOCKET_FILE = 16
-#define SYMBOL_FILE = 32
-#define FIFO_FILE = 64
+#define ORDINARY_FILE   1
+#define DIR_FILE        2
+#define BLOCK_FILE      4
+#define CHAR_FILE       8
+#define SOCKET_FILE     16
+#define SYMBOL_FILE     32
+#define FIFO_FILE       64
 
 // 定义访问许可
-#define IRUSR 256   // 文件主可读
+#define IRUSR 256    // 文件主可读
 #define IWUSR 128    // 文件主可写  
 #define IXUSR 64     // 文件主可执行 
 #define IRGRP 32     // 同组用户可读 
@@ -54,6 +54,9 @@
 #define EVERY_BLOCK 1024
 // 文件系统的总块数
 #define BLOCKS_NUMBERS 8193
+
+// 文件系统中第一个inode节点的位置
+#define FIRST_INODE_BLOCK 4
 
 // 文件系统的第一个数据块位置，从0开始编号使然
 #define FIRST_DATA_BLOCK 132
@@ -141,9 +144,9 @@ struct ext2_bit_map
 
 // 外存索引节点，128个字节
 struct ext2_out_inode {	
-    // TODO __u16 i_mode; 			        /* 文件类型和访问权限 */
-    __u8 i_type;                    /* 文件类型*/
-    __u8 i_mode;                    /* 文件访问权限*/
+    // TODO __u16 i_mode; 			/* 文件类型和访问权限 */
+    __u16 i_type;                   /* 文件类型*/
+    __u16 i_mode;                   /* 文件访问权限*/
 	__u16 i_uid;				    /* 文件拥有者标识号*/
 	__u32 i_size; 				    /* 以字节计的文件大小 */
 	__u32 i_atime; 			        /* 文件的最后一次访问时间 */
@@ -163,7 +166,7 @@ struct ext2_out_inode {
         __u8 l_i_frag;	 		        /* 每块中的片数 */
         __u32 i_faddr;  	            /* 片的地址 */
     };
-    char padding[52];                   // 数据填充，为了对齐
+    char padding[50];                   // 数据填充，为了对齐
 };
 
 // 目录项结构，256个字节
