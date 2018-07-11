@@ -1,6 +1,8 @@
 #ifndef __DISKSTRUCT_H__
 #define __DISKSTRUCT_H__
 
+#include "dataType.h"
+
 #define IS_TRUE 1
 #define IS_FALSE 0
 
@@ -63,15 +65,6 @@
 
 // 定义组描述表项大小
 #define GROUP_DESC_SIZE 32
-
-// 重新定义相关的数据类型
-typedef unsigned int __u32;
-typedef signed int __s32;
-typedef unsigned short int __u16;
-typedef signed short int __s16;
-typedef unsigned char __u8;
-
-typedef unsigned short int BOOL;
 
 // 引导块数据结构
 // 超级块大小为1K

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include "dataType.h"
 #include "diskStruct.h"
 
 // 读写磁盘文件指针
@@ -338,5 +339,8 @@ int main()
     printf("%ld\n", sizeof(dentry));
     printf("%ld\n", sizeof(bit_map));
     printf("%ld\n", sizeof(group_desc_table));
+
+    printf("%ld\n", sizeof(unsigned short));
+    printf("%ld\n", sizeof(unsigned long));
     return 0;
 }
