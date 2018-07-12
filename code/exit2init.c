@@ -213,7 +213,7 @@ BOOL block_bitmap_init()
     } else 
     {
         int i, j;
-        char pad1 = 255, pad2 = 248;
+        char pad1 = 255, pad2 = 240;
         for (i = 0; i < 16; i++)
         {
             bit_map.first[i] = pad1;
@@ -312,16 +312,19 @@ BOOL set_one_bit_of_block_bitmap(int offset, int value, int number)
     {
         fseek(disk, current, SEEK_SET);             // 从初始位置开始偏移
         __u8 current_char = fgetc(disk);
-        while (--offset % 8)
+        __u8 char_temp;
+        if (offset % 8)
         {
-            current_char = current_char << 1;
+            char_temp = current_char >> (8 - offset % 8 + 1);
+            current_char = current_char << (offset % 8 - 1);
         }
         __u8 current_bit = current_char & 0x80;
+
         if (value && current_bit == 0) 
         {
             // 如果value的值为1且当前的位标志为0，则讲其进行置位操作
             current_char = current_char | 0x80;
-        } else if (value == 0 && current_bit)
+        } else if (value == 0 || current_bit)
         {
             // 如果value的值为0且当前的位标志为1，则将其进行置位操作
             current_char = current_char & 0x7F;
@@ -331,6 +334,12 @@ BOOL set_one_bit_of_block_bitmap(int offset, int value, int number)
             printf("块（物理块位图）操作失败！\n");
             fclose(disk);
             return IS_FALSE;
+        }
+        if (offset % 8)
+        {
+            current_char = current_char >> (offset % 8 - 1);
+            char_temp = char_temp << (8 - offset % 8 + 1);
+            current_char = current_char + char_temp;
         }
         // 向磁盘块写入一个字节的内容
         // 由于刚刚读出一个字符的时候，读写指针已经移动，所以要重新寻找相关地址
@@ -367,6 +376,7 @@ __u16 get_one_free_index_bitmap()
         for (; current < INDEX_MAP_SIZE*8; )
         {
             __u8 current_char = fgetc(disk);
+            printf("current_char = %d\n", current_char);
             if (current_char == 255)
             {
                 current += 8;
@@ -379,7 +389,7 @@ __u16 get_one_free_index_bitmap()
                 }
                 // 找到第一个空闲数据块
                 printf("找到第一个空闲inode，编号为%d\n", current - first_begin);
-                return current - first_begin;
+                return current - first_begin + 1;
             }
         }
         printf("获取索引节点失败，当前已经没有inode节点可用\n");
@@ -406,8 +416,12 @@ BOOL set_one_bit_of_index_bitmap(int offset, int value, int number)
     {
         fseek(disk, current, SEEK_SET);             // 从初始位置开始
         __u8 current_char = fgetc(disk);
-        current_char = current_char << (offset % 8 - 1);
-        __u8 char_temp = current_char >> (8 - offset + 1);
+        __u8 char_temp;
+        if (offset % 8)
+        {
+            char_temp = current_char >> (8 - offset % 8 + 1);
+            current_char = current_char << (offset % 8 - 1);
+        }
         
         __u8 current_bit = current_char & 0x80;
         if (value && current_bit == 0)
@@ -423,9 +437,12 @@ BOOL set_one_bit_of_index_bitmap(int offset, int value, int number)
             return IS_FALSE;
         }
         
-        current_char = current_char >> (offset % 8 - 1);
-        char_temp = char_temp << (8 - offset + 1);
-        current_char = current_char + char_temp;
+        if (offset % 8)
+        {
+            current_char = current_char >> (offset % 8 - 1);
+            char_temp = char_temp << (8 - offset % 8 + 1);
+            current_char = current_char + char_temp;
+        }
 
         // 向磁盘块写入一个字节的内容
         // 由于刚刚读出一个字符的时候，读写指针已经移动，所以要重新寻找相关地址
@@ -553,6 +570,12 @@ BOOL out_inode_table_init()
                 fwrite(&root_dir_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
                 fseek(disk, (FIRST_DATA_BLOCK + 4)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_dir_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
+                // 设置数据块被占用的标志
+                printf("空闲块数目：%d\n", get_one_free_block_bitmap());
+                set_one_bit_of_block_bitmap(FIRST_DATA_BLOCK + 1, BLOCK_INDEX_IN_USE, 0);
+                printf("空闲块数目：%d\n", get_one_free_block_bitmap());
+                set_one_bit_of_block_bitmap(FIRST_DATA_BLOCK + 2, BLOCK_INDEX_IN_USE, 0);
+                printf("空闲块数目：%d\n", get_one_free_block_bitmap());
                 printf("文件系统初始化完成，根目录以及root目录已经创建！\n");
                 fclose(disk);
                 return IS_TRUE;
