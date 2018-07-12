@@ -267,7 +267,7 @@ __u16 get_one_free_block_bitmap()
     // 首先获取块位图的开始
     __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH;
     __u32 current = first_begin;
-    if ((disk = fopen(DISK, "r+")) == NULL)
+    if ((disk = fopen(DISK, "r+")) != NULL)
     {
         fseek(disk, current, SEEK_SET);
         for (; current < BIT_MAP_SIZE*8;)
@@ -306,12 +306,16 @@ BOOL set_one_bit_of_block_bitmap(int offset, int value, int number)
     }
     // 首先获取块位图的开始
     __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH + BLOCK_INDEX_BMP_SIZE*number;
-    __u32 current = first_begin + offset;
+    __u32 current = first_begin + offset / 8;
     // 打开文件以取出一位
-    if ((disk = fopen(DISK, "r+")) == NULL) 
+    if ((disk = fopen(DISK, "r+")) != NULL) 
     {
         fseek(disk, current, SEEK_SET);             // 从初始位置开始偏移
         __u8 current_char = fgetc(disk);
+        while (--offset % 8)
+        {
+            current_char = current_char << 1;
+        }
         __u8 current_bit = current_char & 0x80;
         if (value && current_bit == 0) 
         {
@@ -357,7 +361,7 @@ __u16 get_one_free_index_bitmap()
     // 首先获取索引位图的开始
     __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH + BIT_MAP_SIZE;
     __u32 current = first_begin;
-    if ((disk = fopen(DISK, "r+")) == NULL)
+    if ((disk = fopen(DISK, "r+")) != NULL)
     {
         fseek(disk, current, SEEK_SET);
         for (; current < INDEX_MAP_SIZE*8; )
@@ -396,12 +400,15 @@ BOOL set_one_bit_of_index_bitmap(int offset, int value, int number)
     }
     // 首先获取索引位图的开始
     __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH + BIT_MAP_SIZE + BLOCK_INDEX_BMP_SIZE*number;
-    __u32 current = first_begin + offset;
+    __u32 current = first_begin + offset / 8;
     // 打开文件取出当中的某一位
-    if ((disk = fopen(DISK, "r+")) == NULL)
+    if ((disk = fopen(DISK, "r+")) != NULL)
     {
         fseek(disk, current, SEEK_SET);             // 从初始位置开始
         __u8 current_char = fgetc(disk);
+        current_char = current_char << (offset % 8 - 1);
+        __u8 char_temp = current_char >> (8 - offset + 1);
+        
         __u8 current_bit = current_char & 0x80;
         if (value && current_bit == 0)
         {
@@ -416,6 +423,10 @@ BOOL set_one_bit_of_index_bitmap(int offset, int value, int number)
             return IS_FALSE;
         }
         
+        current_char = current_char >> (offset % 8 - 1);
+        char_temp = char_temp << (8 - offset + 1);
+        current_char = current_char + char_temp;
+
         // 向磁盘块写入一个字节的内容
         // 由于刚刚读出一个字符的时候，读写指针已经移动，所以要重新寻找相关地址
         fseek(disk, current, SEEK_SET);
@@ -455,17 +466,101 @@ BOOL out_inode_table_init()
     root_disk.i_dtime = 0xFFFF;
 
     root_disk.i_gid = 0;                        // 文件用户组标识符
-    root_disk.i_links_count = 1;                // 硬链接计数，初始值为0
+    root_disk.i_links_count = 1;                // 硬链接计数，初始值为0，创建root目录之后为1
     root_disk.i_blocks = 1;                     // 文件所占块数，初始化为1
     root_disk.i_flags = 3;                      // 设置文件打开方式为读写
-    root_disk.i_block[0] = FIRST_DATA_BLOCK;    // 设置文件系统的第一个数据块
+    root_disk.i_block[0] = 0;                   // 设置文件系统的第一个数据块
 
-    // 这是第一个inode节点，讲其编号为1，注意，inode节点编号为0的不用
+    // 设置索引位图当中的某一位
+    // 获取第一个inode节点，讲其编号为1，注意，inode节点编号为0的不用
+    // 设置索引位图当中的某一位
+    __u16 inode_number = get_one_free_index_bitmap();
+    if (inode_number && set_one_bit_of_index_bitmap(inode_number, BLOCK_INDEX_IN_USE, 0))
+    {
+        struct ext2_dir_entry_2 root_disk_dentry_one_dot, root_disk_dentry_another_dot;
+        root_disk_dentry_one_dot.inode = inode_number;
+        root_disk_dentry_one_dot.rec_len = 256;             // 目录项所占空间大小为256个字节
+        root_disk_dentry_one_dot.file_type = DIR_FILE;      // 定义文件类型为目录文件
+        strcpy(root_disk_dentry_one_dot.name, ".");
+        root_disk_dentry_one_dot.name_len = 1;
 
-    // 开始设置位图：将使用的数据块以及inode节点置位已使用状态
-    
+        root_disk_dentry_another_dot.inode = inode_number;
+        root_disk_dentry_another_dot.rec_len = 256;             // 目录项所占空间大小为256个字节
+        root_disk_dentry_another_dot.file_type = DIR_FILE;      // 定义文件类型为目录文件
+        strcpy(root_disk_dentry_another_dot.name, "..");
+        root_disk_dentry_another_dot.name_len = 2;
 
-    return IS_TRUE;
+        // 创建root目录
+        __u16 root_inode_number = get_one_free_index_bitmap();
+        if (root_inode_number && set_one_bit_of_index_bitmap(root_inode_number, BLOCK_INDEX_IN_USE, 0))
+        {
+            struct ext2_out_inode root_dir;
+            root_dir.i_type = 0x1111;
+            root_dir.i_mode = permit;
+            root_dir.i_uid = 1;
+
+            __u32 root_dir_make_time;
+            time_t temp = time(NULL);
+            root_dir_make_time = time(&temp);
+            root_dir.i_atime = root_dir_make_time;
+            root_dir.i_ctime = root_dir_make_time;
+            root_dir.i_mtime = root_dir_make_time;
+            root_dir.i_dtime = 0xFFFF;
+
+            root_dir.i_gid = 0;
+            root_dir.i_links_count = 1;
+            root_dir.i_blocks = 1;
+            root_dir.i_flags = 3;
+            root_dir.i_block[0] = 4;
+
+            struct ext2_dir_entry_2 root_dir_dentry;
+            root_dir_dentry.inode = root_inode_number;
+            root_dir_dentry.rec_len = 256;             // 目录项所占空间大小为256个字节
+            root_dir_dentry.file_type = DIR_FILE;      // 定义文件类型为目录文件
+            strcpy(root_dir_dentry.name, "root");
+            root_dir_dentry.name_len = 4;
+
+            // 设置root的根目录
+            struct ext2_dir_entry_2 root_dir_dentry_one_dot, root_dir_dentry_another_dot;
+            root_dir_dentry_one_dot.inode = root_inode_number;
+            root_dir_dentry_one_dot.rec_len = 256;             // 目录项所占空间大小为256个字节
+            root_dir_dentry_one_dot.file_type = DIR_FILE;      // 定义文件类型为目录文件
+            strcpy(root_dir_dentry_one_dot.name, ".");
+            root_dir_dentry_one_dot.name_len = 1;
+
+            root_dir_dentry_another_dot.inode = inode_number;
+            root_dir_dentry_another_dot.rec_len = 256;             // 目录项所占空间大小为256个字节
+            root_dir_dentry_another_dot.file_type = DIR_FILE;      // 定义文件类型为目录文件
+            strcpy(root_dir_dentry_another_dot.name, "..");
+            root_dir_dentry_another_dot.name_len = 2;
+
+            if ((disk = fopen(DISK, "r+")) != NULL)
+            {
+                // 向磁盘写入inode节点
+                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK, SEEK_SET);
+                fwrite(&root_disk, OUT_INODE_LENGTH, 1, disk);
+                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH, SEEK_SET);
+                fwrite(&root_dir, OUT_INODE_LENGTH, 1, disk);
+                // 向磁盘写入根目录的dentry目录
+                fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK, SEEK_SET);
+                fwrite(&root_disk_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
+                fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
+                fwrite(&root_disk_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
+                fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK + 2*DIR_DENTRY_LENGTH, SEEK_SET);
+                fwrite(&root_dir_dentry, DIR_DENTRY_LENGTH, 1, disk);
+                // 向磁盘写入root目录的dentry目录
+                fseek(disk, (FIRST_DATA_BLOCK + 4)*EVERY_BLOCK, SEEK_SET);
+                fwrite(&root_dir_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
+                fseek(disk, (FIRST_DATA_BLOCK + 4)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
+                fwrite(&root_dir_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
+                printf("文件系统初始化完成，根目录以及root目录已经创建！\n");
+                fclose(disk);
+                return IS_TRUE;
+            }
+        }
+    }    
+    printf("硬盘操作失败！\n");
+    return IS_FALSE;
 }
 
 // 文件系统初始化函数
@@ -509,7 +604,7 @@ void ext2_init()
     // 索引表初始化，创建/(根目录)和/root（root目录）
     if (out_inode_table_init())
     {
-        printf("创建根目录成功！\n");
+        printf("创建根目录以及root目录成功！\n");
     }
 }
 

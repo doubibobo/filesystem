@@ -45,6 +45,10 @@
 #define BIT_MAP_SIZE 1024
 // 定义索引位图大小
 #define INDEX_MAP_SIZE 1024
+// 定义块位图和索引位图被使用标志
+#define BLOCK_INDEX_NOT_USE 0
+// 定义块位图和索引位图未被使用标志
+#define BLOCK_INDEX_IN_USE 1
 
 // 定义外存inode节点的长度
 #define OUT_INODE_LENGTH 128
