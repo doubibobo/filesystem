@@ -1,4 +1,6 @@
 #include "exit2init.h"
+#include "memory.h"
+#include "dentry.h"
 
 int main()
 {
@@ -22,5 +24,12 @@ int main()
 
     printf("%ld\n", sizeof(unsigned short));
     printf("%ld\n", sizeof(unsigned long));
+
+    char test[10] = "/root";
+    findInodeByDirFilename(test);
+
+
+    // super_block_out_to_in();
+
     return 0;
 }

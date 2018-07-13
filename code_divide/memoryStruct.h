@@ -1,7 +1,6 @@
 #ifndef __MEMORYSTRUCT_H__
 #define __MEMORYSTRUCT_H__
 
-#include "dataType.h"
 #include "diskStruct.h"
 
 // 定义用户最多打开的文件数目
@@ -27,6 +26,15 @@
 #define SEL_IN   1  // 从设备读取
 #define SEL_OUT  2  // 向设备写入
 
+// 定义超级块和内存inode节点的使用状态，是否被修改，修改的时候需要将超级块回写
+#define IS_MODIFIED 	1
+#define NOT_MODIFIED 	2
+#define WAIT_MODIFIED	3
+#define HAD_MODIFIED	4
+
+// 定义内存超级块的大小
+#define SUPER_BLOCK_LENGTH_IN	1028
+
 // 定义内存超级块
 struct ext2_in_super_block
 {
@@ -34,6 +42,7 @@ struct ext2_in_super_block
     __u8 super_dev;         // 所在设备设备号
     __u8 count;             // 访问计数
     __u8 flag;              // 使用状态
+	__u8 padding;			// 填充字节
 
     // 原始信息
     struct ext2_super_block origin;
@@ -70,8 +79,7 @@ struct file
 
     struct file* f_next;                // 此项的后继指针
     struct file* f_pre;                 // 此项的前驱指针
-    struct inode* f_inode;              // 指向文件对应的inode
-
+    struct ext2_in_inode* f_inode;     	// 指向文件对应的inode
 	struct file_operations * f_op;      // 指向文件操作结构体的指针
 	void *private_data;                 // 指向与文件管理模块有关的私有数据的指针
 };
@@ -91,12 +99,12 @@ struct files_struct
 // 定义超级块的操作函数
 struct super_operations {
 	void (*read_inode) (struct ext2_in_inode *);
-	int (*notify_change) (struct ext2_in_inode *, struct iattr *);
+	// int (*notify_change) (struct ext2_in_inode *, struct iattr *);
 	void (*write_inode) (struct ext2_in_inode *);
 	void (*put_inode) (struct ext2_in_inode *);
 	void (*put_super) (struct ext2_in_super_block *);
 	void (*write_super) (struct ext2_in_super_block *);
-	void (*statfs) (struct ext2_in_super_block *, struct statfs *, int);
+	// void (*statfs) (struct ext2_in_super_block *, struct statfs *, int);
 	int (*remount_fs) (struct ext2_in_super_block *, int *, char *);
 };
 
@@ -114,8 +122,8 @@ struct inode_operations {
 	int (*rename) (struct ext2_in_inode *,const char *,int,struct ext2_in_inode *,const char *,int, int);
 	int (*readlink) (struct ext2_in_inode *,char *,int);
 	int (*follow_link) (struct ext2_in_inode *,struct ext2_in_inode *,int,int,struct ext2_in_inode **);
-	int (*readpage) (struct ext2_in_inode *, struct page *);
-	int (*writepage) (struct ext2_in_inode *, struct page *);
+	// int (*readpage) (struct ext2_in_inode *, struct page *);
+	// int (*writepage) (struct ext2_in_inode *, struct page *);
 	int (*bmap) (struct ext2_in_inode *,int);
 	void (*truncate) (struct ext2_in_inode *);
 	int (*permission) (struct ext2_in_inode *, int);
@@ -130,7 +138,7 @@ struct file_operations {
 	int (*readdir) (struct ext2_in_inode *, struct file *, void *, int);
 	int (*select) (struct ext2_in_inode *, struct file *, int, int);
 	int (*ioctl) (struct ext2_in_inode *, struct file *, unsigned int, unsigned long);
-	int (*mmap) (struct ext2_in_inode *, struct file *, struct vm_area_struct *);
+	// int (*mmap) (struct ext2_in_inode *, struct file *, struct vm_area_struct *);
 	int (*open) (struct ext2_in_inode *, struct file *);
 	void (*release) (struct ext2_in_inode *, struct file *);
 	int (*fsync) (struct ext2_in_inode *, struct file *);

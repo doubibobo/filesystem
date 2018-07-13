@@ -223,6 +223,7 @@ BOOL block_bitmap_init()
             fwrite(&bit_map, sizeof(struct ext2_bit_map), GROUP_NUMBER, disk);
         }
         printf("块位图初始化成功!\n");
+        fclose(disk);
         return IS_TRUE;        
     }
 }
@@ -279,13 +280,16 @@ __u16 get_one_free_block_bitmap()
                 }
                 // 找到第一个空闲数据块
                 printf("找到第一个空闲数据块，编号为%d\n", current - first_begin);
+                fclose(disk);
                 return current - first_begin;
             }
         }
         printf("获取数据块失败，当前已经没有数据块可用！\n");
+        fclose(disk);
         return 0;
     }
     printf("获取数据块失败！\n");
+    fclose(disk);
     return 0;
 }
 
@@ -383,10 +387,12 @@ __u16 get_one_free_index_bitmap()
                 }
                 // 找到第一个空闲数据块
                 printf("找到第一个空闲inode，编号为%d\n", current - first_begin);
+                fclose(disk);
                 return current - first_begin + 1;
             }
         }
         printf("获取索引节点失败，当前已经没有inode节点可用\n");
+        fclose(disk);
         return 0;
     }
     printf("获取索引节点失败！\n");
@@ -479,6 +485,7 @@ BOOL out_inode_table_init()
     root_disk.i_gid = 0;                        // 文件用户组标识符
     root_disk.i_links_count = 1;                // 硬链接计数，初始值为0，创建root目录之后为1
     root_disk.i_blocks = 1;                     // 文件所占块数，初始化为1
+    root_disk.i_size = 2;
     root_disk.i_flags = 3;                      // 设置文件打开方式为读写
     root_disk.i_block[0] = 0;                   // 设置文件系统的第一个数据块
 
@@ -487,7 +494,7 @@ BOOL out_inode_table_init()
     // 设置索引位图当中的某一位
     __u16 inode_number = get_one_free_index_bitmap();
     if (inode_number && set_one_bit_of_index_bitmap(inode_number, BLOCK_INDEX_IN_USE, 0))
-    {
+    {   
         struct ext2_dir_entry_2 root_disk_dentry_one_dot, root_disk_dentry_another_dot;
         root_disk_dentry_one_dot.inode = inode_number;
         root_disk_dentry_one_dot.rec_len = 256;             // 目录项所占空间大小为256个字节
@@ -521,8 +528,11 @@ BOOL out_inode_table_init()
             root_dir.i_gid = 0;
             root_dir.i_links_count = 1;
             root_dir.i_blocks = 1;
+            root_dir.i_size = 2;
             root_dir.i_flags = 3;
-            root_dir.i_block[0] = 4;
+            root_dir.i_block[0] = 1;
+
+            root_disk.i_size++;
 
             struct ext2_dir_entry_2 root_dir_dentry;
             root_dir_dentry.inode = root_inode_number;
@@ -547,10 +557,13 @@ BOOL out_inode_table_init()
 
             if ((disk = fopen(DISK, "r+")) != NULL)
             {
+                
+                printf("\n\n%d, %d\n\n", inode_number, root_inode_number);
+
                 // 向磁盘写入inode节点
-                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK, SEEK_SET);
+                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(inode_number - 1), SEEK_SET);
                 fwrite(&root_disk, OUT_INODE_LENGTH, 1, disk);
-                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH, SEEK_SET);
+                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(root_inode_number - 1), SEEK_SET);
                 fwrite(&root_dir, OUT_INODE_LENGTH, 1, disk);
                 // 向磁盘写入根目录的dentry目录
                 fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK, SEEK_SET);
@@ -560,9 +573,9 @@ BOOL out_inode_table_init()
                 fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK + 2*DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_dir_dentry, DIR_DENTRY_LENGTH, 1, disk);
                 // 向磁盘写入root目录的dentry目录
-                fseek(disk, (FIRST_DATA_BLOCK + 4)*EVERY_BLOCK, SEEK_SET);
+                fseek(disk, (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK, SEEK_SET);
                 fwrite(&root_dir_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
-                fseek(disk, (FIRST_DATA_BLOCK + 4)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
+                fseek(disk, (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_dir_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
                 // 设置数据块被占用的标志
                 printf("空闲块数目：%d\n", get_one_free_block_bitmap());

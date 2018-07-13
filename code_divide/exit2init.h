@@ -6,7 +6,6 @@
 #include <sys/ioctl.h>
 #include <time.h>
 
-#include "dataType.h"
 #include "diskStruct.h"
 
 // 引导块初始化

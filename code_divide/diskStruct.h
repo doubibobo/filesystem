@@ -75,6 +75,9 @@
 // 定义组描述表项大小
 #define GROUP_DESC_SIZE 32
 
+//　定义每一个组的inode节点所占的块数
+#define EVERY_GROUP_INODE_BLOCK 16
+
 // 引导块数据结构
 // 超级块大小为1K
 struct ext2_super_block
@@ -161,7 +164,7 @@ struct ext2_out_inode {
 	__u32 i_dtime; 			        /* 文件删除时间 */
 	__u16 i_gid;				    /* 文件的用户组标志符 */
 	__u16 i_links_count; 		    /* 文件的硬链接计数 */
-	__u32 i_blocks; 			    /* 文件所占块数（每块以512字节计）*/
+	__u32 i_blocks; 			    /* 文件所占块数（每块以256字节计）*/
     __u32 i_flags;				    /* 打开文件的方式 */
     union
     {  					            /* 特定操作系统的信息*/
@@ -172,7 +175,7 @@ struct ext2_out_inode {
         __u8 l_i_frag;	 		        /* 每块中的片数 */
         __u32 i_faddr;  	            /* 片的地址 */
     };
-    char padding[50];                   // 数据填充，为了对齐
+    char padding[46];                   // 数据填充，为了对齐
 };
 
 // 目录项结构，256个字节
