@@ -565,6 +565,7 @@ BOOL out_inode_table_init()
                 fwrite(&root_disk, OUT_INODE_LENGTH, 1, disk);
                 fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(root_inode_number - 1), SEEK_SET);
                 fwrite(&root_dir, OUT_INODE_LENGTH, 1, disk);
+                
                 // 向磁盘写入根目录的dentry目录
                 fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK, SEEK_SET);
                 fwrite(&root_disk_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
@@ -577,6 +578,7 @@ BOOL out_inode_table_init()
                 fwrite(&root_dir_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
                 fseek(disk, (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_dir_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
+
                 // 设置数据块被占用的标志
                 printf("空闲块数目：%d\n", get_one_free_block_bitmap());
                 set_one_bit_of_block_bitmap(FIRST_DATA_BLOCK + 1, BLOCK_INDEX_IN_USE, 0);

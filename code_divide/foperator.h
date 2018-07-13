@@ -1,7 +1,7 @@
 #ifndef __FOPERATOR_H__
-
 #define __FOPERATOR_H__
 
+#include "dentry.h"
 #include "exit2init.h"
 
 // 创建文件
