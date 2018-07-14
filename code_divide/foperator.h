@@ -22,4 +22,7 @@ BOOL modifyFile(char* filename, char* current);
 // 读文件（将文件读出）
 BOOL readFile(char* filename, char* current);
 
+// 修改当前工作目录
+BOOL changeFile(char* current, char* filename);
+
 #endif

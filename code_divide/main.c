@@ -2,6 +2,7 @@
 #include "exit2init.h"
 #include "foperator.h"
 #include "memory.h"
+#include "print.h"
 
 int main()
 {
@@ -35,65 +36,72 @@ int main()
     printf("********\n");
     printf("********\n");
 
-    if (createFile("var456", DIR_FILE, test))
-    {
-        printf("-----------------------------------\n");
-        selectFile(test);
-    }
+    // if (createFile("var456", DIR_FILE, test))
+    // {
+    //     printf("-----------------------------------\n");
+    //     selectFile(test);
+    // }
 
-    if (createFile("dir2", ORDINARY_FILE, test))
-    {
-        printf("+++++++++++++++++++++++++++++++++++\n");
-        selectFile(test);
-    }
+    // if (createFile("dir2", ORDINARY_FILE, test))
+    // {
+    //     printf("+++++++++++++++++++++++++++++++++++\n");
+    //     selectFile(test);
+    // }
 
-    if (createFile("dir3", ORDINARY_FILE, test))
-    {
-        printf("+++++++++++++++++++++++++++++++++++\n");
-        selectFile(test);
-    }
+    // if (createFile("dir3", ORDINARY_FILE, test))
+    // {
+    //     printf("+++++++++++++++++++++++++++++++++++\n");
+    //     selectFile(test);
+    // }
 
-    printf("********\n");
-    printf("********\n");
-    printf("********\n");
+    // printf("********\n");
+    // printf("********\n");
+    // printf("********\n");
 
-    if (openFile("var456", test))
-    {
-        printf("temp = %s\n", test);
-        selectFile(test);
-    }
+    // if (openFile("var456", test))
+    // {
+    //     printf("temp = %s\n", test);
+    //     selectFile(test);
+    // }
 
-    if (openFile("dir2", test))
-    {
-        printf("temp = %s\n", test);
-        selectFile(test);
-    }
+    // if (openFile("dir2", test))
+    // {
+    //     printf("temp = %s\n", test);
+    //     selectFile(test);
+    // }
 
-    selectFile(test);
+    // selectFile(test);
 
-    printf("现在开始写文件！\n");
-    if (modifyFile("dir3", test))
-    {
-        printf("写文件结束\n");
-        // selectFile(test);
-    }
+    // printf("现在开始写文件！\n");
+    // if (modifyFile("dir3", test))
+    // {
+    //     printf("写文件结束\n");
+    //     // selectFile(test);
+    // }
 
-    selectFile(test);
+    // selectFile(test);
 
-    if (readFile("dir3", test))
-    {
-        printf("+++++++++++++++++++++++++++++++++++\n");
-        // selectFile(test);
-    }
+    // if (readFile("dir3", test))
+    // {
+    //     printf("+++++++++++++++++++++++++++++++++++\n");
+    //     // selectFile(test);
+    // }
 
-    selectFile(test);
+    // selectFile(test);
     
-    printf("开始删除文件！\n");
+    // printf("开始删除文件！\n");
 
-    if (deleteFile("dir3", test))
-    {
-        selectFile(test);
-    }
+    // if (deleteFile("dir3", test))
+    // {
+    //     selectFile(test);
+    // }
+
+    // printf("\n");
+
+    // printf("******************************************************************\n");
+
+    clean();
+    print(test);
 
     // if ()
     // {
