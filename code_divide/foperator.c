@@ -27,9 +27,9 @@ BOOL createFile(char* filename, __u8 type, char* current)
             // 找到第一个空闲inode节点
             fclose(current_disk);
             __u16 free_inode = get_one_free_index_bitmap();
+            printf("free_inode = %d\n", free_inode);
             if (free_inode && set_one_bit_of_index_bitmap(free_inode, BLOCK_INDEX_IN_USE, 0))
             {   // 修改原来的inode
-                now_inode.i_links_count++;
                 // 设置inode节点
                 // 定义根目录的权限
                 struct ext2_out_inode free_out_inode;
@@ -66,13 +66,13 @@ BOOL createFile(char* filename, __u8 type, char* current)
                     dir1.inode = free_inode;
                     dir1.rec_len = 256;             // 目录项所占空间大小为256个字节
                     dir1.file_type = DIR_FILE;      // 定义文件类型为目录文件
-                    strcpy(dir1.name, "q");
+                    strcpy(dir1.name, ".");
                     dir1.name_len = 1;
 
                     dir2.inode = free_inode;
                     dir2.rec_len = 256;             // 目录项所占空间大小为256个字节
                     dir2.file_type = DIR_FILE;      // 定义文件类型为目录文件
-                    strcpy(dir2.name, "qq");
+                    strcpy(dir2.name, "..");
                     dir2.name_len = 2;
 
                     // 重新打开文件
@@ -96,8 +96,20 @@ BOOL createFile(char* filename, __u8 type, char* current)
                     free_out_inode.i_links_count = 0;
                 }
                 printf("free_inode = %d\n", free_inode);
+                fclose(current_disk);
+                if ((current_disk = fopen(DISK, "r+")) == NULL)
+                {   
+                    printf("重新打开文件失败！\n");
+                    return IS_FALSE;
+                }
                 // 将新的inode节点写入
-                fseek(current_disk, HOME_LENGTH + FIRST_DATA_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(free_inode - 1), SEEK_SET);
+                if (0 == fseek(current_disk, HOME_LENGTH + FIRST_DATA_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(free_inode - 1), SEEK_SET))
+                {
+                    printf("xindedinodddddddddddddddd\n");
+                } else 
+                {
+                    printf("ddddddddddddddddddddddddd\n");
+                }
                 fwrite(&free_out_inode, OUT_INODE_LENGTH, 1, current_disk);
                 fclose(current_disk);
                 // 生成一个新的dentry节点
@@ -106,12 +118,12 @@ BOOL createFile(char* filename, __u8 type, char* current)
                 strcpy(new_dentry.name, filename);
                 new_dentry.name_len = strlen(filename);
                 new_dentry.rec_len = 256;
-                new_dentry.inode = current_inode;
+                new_dentry.inode = free_inode;
                 // 读出数据之后，首先判断i_blocks以及i_size
                 // 如果当前的i_size项数是4的倍数，说明需要申请一个数据块，如果不是，则找到其数据块
                 printf("------------------%d-----------------\n", now_inode.i_size);
                 printf("\n\n\n\n%s\n\n\n\n", new_dentry.name);
-                if (now_inode.i_size % 4)
+                if (now_inode.i_links_count % 4)
                 { 
                     // 不需要申请数据块，直接将dentry写入原有的inode对应的目录项
                     // 计算目录表项当前的偏移块数， 注意其从0开始
@@ -133,12 +145,11 @@ BOOL createFile(char* filename, __u8 type, char* current)
                         printf("\n\n\n\n找文件失败！\n");
                     }
                     fwrite(&new_dentry, DIR_DENTRY_LENGTH, 1, current_disk);
+                    fclose(current_disk);
                     now_inode.i_size++;
                 } else 
                 {   // 需要申请数据块的情形
                     now_inode.i_size++;
-                    // 文件暂时关闭
-                    fclose(current_disk);
                     // 申请一个空闲数据块
                     __u16 new_dentry_block = get_one_free_block_bitmap();
                     // 设置其被占用
@@ -157,15 +168,15 @@ BOOL createFile(char* filename, __u8 type, char* current)
                     // 将新建的dentry写入磁盘
                     fseek(current_disk, HOME_LENGTH + new_dentry_block * EVERY_BLOCK, SEEK_SET);
                     fwrite(&new_dentry, DIR_DENTRY_LENGTH, 1, current_disk);
+                    fclose(current_disk);
                 }
+                now_inode.i_links_count++;
                 printf("%d\n", current_inode);
-                fclose(current_disk);
                 if ((current_disk = fopen(DISK, "r+")) == NULL)
                 {
                     printf("错误！\n");
                     return IS_FALSE;
                 }
-
                 if (0 == fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET))
                 {
                     printf("已经找到inode节点位置！\n");
@@ -177,7 +188,6 @@ BOOL createFile(char* filename, __u8 type, char* current)
                 printf("创建文件成功\n");
                 fclose(current_disk);
                 return IS_TRUE;
-
             } else 
             {
                 printf("没有空闲的inode节点！\n");
@@ -201,11 +211,89 @@ BOOL deleteFile(char* filename, char* current)
     } else 
     {   // 获取inode节点的内容
         struct ext2_out_inode now_inode;
+        struct ext2_dir_entry_2 dir_dentry;
         if ((current_disk = fopen(DISK, "r+")) != NULL)
         {
-            fseek(current_disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET);
+            printf("current_inode = %d\n", current_inode);
+
+            fseek(current_disk,  HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET);
             fread(&now_inode, OUT_INODE_LENGTH, 1, current_disk);
+
+            printf("i_links_count = %d\n", now_inode.i_links_count);
+
             // 找到其所使用的数据块
+            int i;
+            for (i = 0; i < now_inode.i_links_count; i++)
+            {
+                fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + now_inode.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH*(i%4), SEEK_SET);
+                fread(&dir_dentry, DIR_DENTRY_LENGTH, 1, current_disk);
+                if (0 == strcmp(dir_dentry.name, filename))
+                {
+                    // 找到了指定的文件，首先判断文件的类型
+                    if (dir_dentry.file_type == DIR_FILE)
+                    {   // 如果是目录文件
+                        fclose(current_disk);
+                        printf("该文件的inode节点编号为：%d, 现在开始删除该目录！\n", dir_dentry.inode);
+                        printf("当前路径为：%s%s\n", current, filename);
+                        return IS_TRUE;
+                    }
+                    if (dir_dentry.file_type == ORDINARY_FILE)
+                    {
+                        // 如果是普通文件
+                        printf("该文件的inode节点编号为：%d, 现在开始删除该文件！\n", dir_dentry.inode);
+                        printf("当前路径为：%s%s\n", current, filename);
+
+                        // 通过dentry中的inode编号，讲该inode节点的位图设置为0
+                        set_one_bit_of_index_bitmap(dir_dentry.inode, BLOCK_INDEX_NOT_USE, 0);
+                        // 删除该dentry目录，注意一定是删除最后一项的时候有效，否则无效
+                        // 修改inode节点并且写回
+                        fclose(current_disk);
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("读文件失败！\n");
+                            return IS_FALSE;
+                        }
+                        struct ext2_out_inode the_next_inode;
+
+                        // 找到文件对应的inode的位置
+                        printf("找到的inode：%d\n", HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1));
+                        if ( 0 == fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET))
+                        {
+                            printf("-----------------------------------------------------------------------\n");
+                        } else 
+                        {
+                            printf("///////////////////////////////////////////////////////////////////////\n");
+                        }
+                        fread(&the_next_inode, OUT_INODE_LENGTH, 1, current_disk);
+
+                        the_next_inode.i_links_count--;
+
+                        fclose(current_disk);
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("读文件失败！\n");
+                            return IS_FALSE;
+                        }
+
+                        printf("HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1) = %d\n", HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1));
+
+                        // 将inode写回
+                        if ( 0 == fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET))
+                        {
+                            printf("-----------------------------------------------------------------------\n");
+                        } else 
+                        {
+                            printf("///////////////////////////////////////////////////////////////////////\n");
+                        }
+                        fwrite(&the_next_inode, OUT_INODE_LENGTH, 1, current_disk);
+                        printf("%d^^^^^^^^^^^^^^^^^^^^^\n", the_next_inode.i_links_count);
+                        fclose(current_disk);
+                        return IS_TRUE;
+                    }
+                }
+            }
+            printf("没有找到该文件！\n");
+            fclose(current_disk);
         }
     }
     return IS_FALSE;
@@ -225,9 +313,12 @@ BOOL selectFile(char* current)
         struct ext2_dir_entry_2 dir_dentry;
         if ((current_disk = fopen(DISK, "r+")) != NULL)
         {
+            printf("select = %d\n", HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1));
             fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET);
             fread(&now_inode, OUT_INODE_LENGTH, 1, current_disk);
             int i;
+            printf("current_inode = %d\n", current_inode);
+            printf("now_inode.i_links_count = %d\n", now_inode.i_links_count);
             for (i = 0; i < now_inode.i_links_count; i++)
             {
                 fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + now_inode.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH * (i % 4), SEEK_SET);
@@ -258,28 +349,31 @@ BOOL openFile(char* filename, char* current)
             fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET);
             fread(&now_inode, OUT_INODE_LENGTH, 1, current_disk);
             int i;
-            for (i = 0; i < now_inode.i_size; i++)
+            for (i = 0; i < now_inode.i_links_count; i++)
             {
-                fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + now_inode.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH*i, SEEK_SET);
+                fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + now_inode.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH*(i%4), SEEK_SET);
                 fread(&dir_dentry, DIR_DENTRY_LENGTH, 1, current_disk);
                 if (0 == strcmp(dir_dentry.name, filename))
                 {
                     // 找到了指定的文件，首先判断文件的类型
                     if (dir_dentry.file_type == DIR_FILE)
                     {   // 如果是目录文件
-                        // printf("the root inode %d\n", dir_dentry.inode);
-                        strcat(current, filename);
+                        fclose(current_disk);
+                        printf("该文件的inode节点编号为：%d, 成功打开该目录！\n", dir_dentry.inode);
+                        printf("当前路径为：%s%s\n", current, filename);
                         return IS_TRUE;
                     }
                     if (dir_dentry.file_type == ORDINARY_FILE)
                     {
                         // 如果是普通文件
-                        
+                        printf("该文件的inode节点编号为：%d, 成功打开该文件！\n", dir_dentry.inode);
+                        fclose(current_disk);
+                        return IS_TRUE;
                     }
                 }
             }
             fclose(current_disk);
-            return IS_TRUE; 
+            return IS_FALSE; 
         }
     }
     return IS_FALSE;
@@ -287,6 +381,185 @@ BOOL openFile(char* filename, char* current)
 
 // 写文件（修改文件）
 BOOL modifyFile(char* filename, char* current)
-{   // filename 为要打开的文件， current为当前工作目录
+{    // current 为当前工作目录
+    __u16 current_inode = findInodeByDirFilename(current);
+    if (current_inode == 0) 
+    {
+        printf("没有找到对应的inode节点，文件系统错误！\n");
+        return IS_FALSE;
+    } else 
+    {   // 获取inode节点的内容
+        struct ext2_out_inode now_inode;
+        struct ext2_dir_entry_2 dir_dentry;
+        if ((current_disk = fopen(DISK, "r+")) != NULL)
+        {
+            fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET);
+            fread(&now_inode, OUT_INODE_LENGTH, 1, current_disk);
+            int i;
+            for (i = 0; i < now_inode.i_links_count; i++)
+            {
+                fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + now_inode.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH*(i%4), SEEK_SET);
+                fread(&dir_dentry, DIR_DENTRY_LENGTH, 1, current_disk);
+                if (0 == strcmp(dir_dentry.name, filename))
+                {
+                    // 找到了指定的文件，首先判断文件的类型
+                    if (dir_dentry.file_type == DIR_FILE)
+                    {
+                        fclose(current_disk);
+                        printf("由于文件是目录文件，不能执行修改操作！\n");
+                        return IS_TRUE;
+                    }
+                    if (dir_dentry.file_type == ORDINARY_FILE)
+                    {
+                        fclose(current_disk);
+                        // 如果是普通文件
+                        printf("the inode number is %d\n", dir_dentry.inode);
+                        printf("please input your words, ending by Enter:\n");
+                        char buffer[1024];
+                        gets(buffer);
+                        puts(buffer);
 
+                        // 申请一个空闲数据块
+                        __u16 new_dentry_block = get_one_free_block_bitmap() + 1;
+                        // 设置其被占用
+                        set_one_bit_of_block_bitmap(new_dentry_block + 1, BLOCK_INDEX_IN_USE, 0);
+                        printf("new_dentry_block = %d\n", new_dentry_block);
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("写入文件失败！\n");
+                            return IS_FALSE;
+                        }
+                        printf("HOME_LENGTH + new_dentry_block * EVERY_BLOCK = %d\n", HOME_LENGTH + new_dentry_block * EVERY_BLOCK);
+                        fseek(current_disk, HOME_LENGTH + new_dentry_block * EVERY_BLOCK, SEEK_SET);
+                        fwrite(&buffer, 1024, 1, current_disk);
+                        fclose(current_disk);
+
+                        // now_inode.i_block[now_inode.i_blocks] = new_dentry_block - FIRST_DATA_BLOCK;
+                        // now_inode.i_blocks++;
+
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("写入文件失败！\n");
+                            return IS_FALSE;
+                        }
+
+                        struct ext2_out_inode inode_rewrite;
+
+                        // 找到该文件对应的inode
+                        fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (dir_dentry.inode - 1), SEEK_SET);
+                        fread(&inode_rewrite, OUT_INODE_LENGTH, 1, current_disk);
+                        fclose(current_disk);
+                        
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("写入文件失败！\n");
+                            return IS_FALSE;
+                        }
+
+                        inode_rewrite.i_block[inode_rewrite.i_blocks] = new_dentry_block - FIRST_DATA_BLOCK;
+                        inode_rewrite.i_blocks++;
+                        printf("对应文件的inode：%d\n", HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (dir_dentry.inode - 1));
+                        printf("\n%d\n", inode_rewrite.i_block[0]);
+
+                        // 回写inode
+                        fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (dir_dentry.inode - 1), SEEK_SET);
+                        fwrite(&inode_rewrite, OUT_INODE_LENGTH, 1, current_disk);
+
+                        printf("该文件的inode节点编号为：%d, 成功写入该文件！\n", dir_dentry.inode);
+                        fclose(current_disk);
+                        return IS_TRUE;
+                    }
+                }
+            }
+            fclose(current_disk);
+            return IS_FALSE; 
+        
+        }
+    }
+}
+
+// 读文件（将文件读出）
+BOOL readFile(char* filename, char* current)
+{   // current 为当前工作目录
+    __u16 current_inode = findInodeByDirFilename(current);
+    if (current_inode == 0) 
+    {
+        printf("没有找到对应的inode节点，文件系统错误！\n");
+        return IS_FALSE;
+    } else 
+    {   // 获取inode节点的内容
+        struct ext2_out_inode now_inode;
+        struct ext2_dir_entry_2 dir_dentry;
+        if ((current_disk = fopen(DISK, "r+")) != NULL)
+        {
+            fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (current_inode - 1), SEEK_SET);
+            fread(&now_inode, OUT_INODE_LENGTH, 1, current_disk);
+            int i;
+            for (i = 0; i < now_inode.i_links_count; i++)
+            {
+                fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + now_inode.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH*(i%4), SEEK_SET);
+                fread(&dir_dentry, DIR_DENTRY_LENGTH, 1, current_disk);
+                if (0 == strcmp(dir_dentry.name, filename))
+                {
+                    // 找到了指定的文件，首先判断文件的类型
+                    if (dir_dentry.file_type == DIR_FILE)
+                    {
+                        fclose(current_disk);
+                        printf("由于文件是目录文件，不能执行读操作，请使用列出所有文件的功能！\n");
+                        return IS_TRUE;
+                    }
+                    if (dir_dentry.file_type == ORDINARY_FILE)
+                    {
+                        fclose(current_disk);
+                        // 如果是普通文件
+                        printf("the inode number is %d\n", dir_dentry.inode);
+                        printf("this is the content of the file:\n");
+                        char buffer[1024];
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("读文件失败！\n");
+                            return IS_FALSE;
+                        }
+                        struct ext2_out_inode the_next_inode;
+
+                        // 找到文件对应的inode的位置
+                        printf("找到的inode：%d\n", HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (dir_dentry.inode - 1));
+                        if ( 0 == fseek(current_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH * (dir_dentry.inode - 1), SEEK_SET))
+                        {
+                            printf("-----------------------------------------------------------------------\n");
+                        } else 
+                        {
+                            printf("///////////////////////////////////////////////////////////////////////\n");
+                        }
+                        fread(&the_next_inode, OUT_INODE_LENGTH, 1, current_disk);
+                        fclose(current_disk);
+                        printf("the_next_inode = %d\n", the_next_inode.i_block[0]);
+
+                        if ((current_disk = fopen(DISK, "r+")) == NULL)
+                        {
+                            printf("读文件失败！\n");
+                            return IS_FALSE;
+                        }
+
+                        // 找到inode对应的数据块的位置
+                        printf("HOME_LENGTH + (FIRST_DATA_BLOCK + the_next_inode.i_block[0])*EVERY_BLOCK = %d\n", HOME_LENGTH + (FIRST_DATA_BLOCK + the_next_inode.i_block[0])*EVERY_BLOCK);
+                        fseek(current_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + the_next_inode.i_block[0])*EVERY_BLOCK, SEEK_SET);
+                        fread(&buffer, 1024, 1, current_disk);
+                        puts(buffer);
+
+                        fclose(current_disk);
+                        printf("该文件的inode节点编号为：%d, 成功读出该文件！\n", dir_dentry.inode);
+                        return IS_TRUE;
+                    }
+                }
+            }
+
+            printf("没有找到该文件，请检查后重试！\n");
+
+            fclose(current_disk);
+            return IS_FALSE; 
+        }
+    }
+    printf("文件系统操作错误哈哈哈哈！\n");
+    return IS_FALSE;
 }

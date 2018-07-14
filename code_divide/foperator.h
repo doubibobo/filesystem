@@ -19,4 +19,7 @@ BOOL openFile(char* filename, char* current);
 // 写文件（修改文件）
 BOOL modifyFile(char* filename, char* current);
 
+// 读文件（将文件读出）
+BOOL readFile(char* filename, char* current);
+
 #endif

@@ -35,8 +35,7 @@ int main()
     printf("********\n");
     printf("********\n");
 
-
-    if (createFile("var123", DIR_FILE, test))
+    if (createFile("var456", DIR_FILE, test))
     {
         printf("-----------------------------------\n");
         selectFile(test);
@@ -48,11 +47,55 @@ int main()
         selectFile(test);
     }
 
+    if (createFile("dir3", ORDINARY_FILE, test))
+    {
+        printf("+++++++++++++++++++++++++++++++++++\n");
+        selectFile(test);
+    }
+
     printf("********\n");
     printf("********\n");
     printf("********\n");
 
-    // if (openFile("home", test))
+    if (openFile("var456", test))
+    {
+        printf("temp = %s\n", test);
+        selectFile(test);
+    }
+
+    if (openFile("dir2", test))
+    {
+        printf("temp = %s\n", test);
+        selectFile(test);
+    }
+
+    selectFile(test);
+
+    printf("现在开始写文件！\n");
+    if (modifyFile("dir3", test))
+    {
+        printf("写文件结束\n");
+        // selectFile(test);
+    }
+
+    selectFile(test);
+
+    if (readFile("dir3", test))
+    {
+        printf("+++++++++++++++++++++++++++++++++++\n");
+        // selectFile(test);
+    }
+
+    selectFile(test);
+    
+    printf("开始删除文件！\n");
+
+    if (deleteFile("dir3", test))
+    {
+        selectFile(test);
+    }
+
+    // if ()
     // {
     //     printf("***********************************\n");
     //     printf("~~~~~~~~~~~~~~~~%s~~~~~~~~~~~~~~~~~\n", test);

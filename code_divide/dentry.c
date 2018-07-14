@@ -23,22 +23,32 @@ __u16 findInodeByDirFilename(char filename[])
             // 以'/'分割字符
             char *result = strtok(filename, delims);
             while(result != NULL) { 
-                
-                // printf("result = %s", result);
-
                 int i;
-                for (i = 0; i < root_disk.i_size; i++)
+                for (i = 0; i < root_disk.i_links_count; i++)
                 {
-                    fseek(file_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + root_disk.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH*i, SEEK_SET);
+                    if ( 0 == fseek(file_disk, HOME_LENGTH + (FIRST_DATA_BLOCK + root_disk.i_block[i/4])*EVERY_BLOCK + DIR_DENTRY_LENGTH * (i % 4), SEEK_SET))
+                    {
+                        printf("dir success\n");
+                    } else 
+                    {
+                        printf("dir error!\n");
+                    }
                     fread(&dir_dentry, DIR_DENTRY_LENGTH, 1, file_disk);
                     if (0 == strcmp(result, dir_dentry.name)) 
                     {
                         flag = 1;
+                        printf("dir_dentry.inode = %d\n", dir_dentry.inode);
                         break;
                     }
                 } 
                 // 根据找到的inode，重新定位数据块
-                fseek(file_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(dir_dentry.inode - 1),SEEK_SET);
+                if ( 0 == fseek(file_disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(dir_dentry.inode - 1),SEEK_SET))
+                {
+                    printf("success\n");
+                } else 
+                {
+                    printf("error!");
+                }
                 fread(&root_disk, OUT_INODE_LENGTH, 1, file_disk);
                 result = strtok(NULL, delims); 
                 if (flag && !result)
