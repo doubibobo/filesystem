@@ -26,9 +26,46 @@ int main()
     printf("%ld\n", sizeof(unsigned short));
     printf("%ld\n", sizeof(unsigned long));
 
-    char test[10] = "/root";
+    char test[10] = "/";
     findInodeByDirFilename(test);
 
+    selectFile(test);
+
+    printf("********\n");
+    printf("********\n");
+    printf("********\n");
+
+
+    if (createFile("var123", DIR_FILE, test))
+    {
+        printf("-----------------------------------\n");
+        selectFile(test);
+    }
+
+    if (createFile("dir2", ORDINARY_FILE, test))
+    {
+        printf("+++++++++++++++++++++++++++++++++++\n");
+        selectFile(test);
+    }
+
+    printf("********\n");
+    printf("********\n");
+    printf("********\n");
+
+    // if (openFile("home", test))
+    // {
+    //     printf("***********************************\n");
+    //     printf("~~~~~~~~~~~~~~~~%s~~~~~~~~~~~~~~~~~\n", test);
+    //     selectFile(test);
+    // }
+    
+
+
+    // if (createFile("dir", DIR_FILE, test))
+    // {
+    //     printf("+++++++++++++++++++++++++++++++++++\n");
+    //     selectFile(test);
+    // }
 
     // super_block_out_to_in();
 

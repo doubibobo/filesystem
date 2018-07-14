@@ -262,8 +262,10 @@ __u16 get_one_free_block_bitmap()
     // 首先获取块位图的开始
     __u32 first_begin = HOME_LENGTH + SUPER_BLOCK_LENGTH + GROUP_DESC_BLOCK_LENGTH;
     __u32 current = first_begin;
+    printf("#####################33\n");
     if ((disk = fopen(DISK, "r+")) != NULL)
     {
+        printf("#####################44\n");
         fseek(disk, current, SEEK_SET);
         for (; current < BIT_MAP_SIZE*8;)
         {
@@ -279,6 +281,8 @@ __u16 get_one_free_block_bitmap()
                     ++current;
                 }
                 // 找到第一个空闲数据块
+                printf("current = %d\n", current);
+
                 printf("找到第一个空闲数据块，编号为%d\n", current - first_begin);
                 fclose(disk);
                 return current - first_begin;
@@ -483,7 +487,7 @@ BOOL out_inode_table_init()
     root_disk.i_dtime = 0xFFFF;
 
     root_disk.i_gid = 0;                        // 文件用户组标识符
-    root_disk.i_links_count = 1;                // 硬链接计数，初始值为0，创建root目录之后为1
+    root_disk.i_links_count = 2;                // 硬链接计数，初始值为0，创建root目录之后为1
     root_disk.i_blocks = 1;                     // 文件所占块数，初始化为1
     root_disk.i_size = 2;
     root_disk.i_flags = 3;                      // 设置文件打开方式为读写
@@ -526,13 +530,14 @@ BOOL out_inode_table_init()
             root_dir.i_dtime = 0xFFFF;
 
             root_dir.i_gid = 0;
-            root_dir.i_links_count = 1;
+            root_dir.i_links_count = 2;
             root_dir.i_blocks = 1;
             root_dir.i_size = 2;
             root_dir.i_flags = 3;
             root_dir.i_block[0] = 1;
 
             root_disk.i_size++;
+            root_disk.i_links_count++;
 
             struct ext2_dir_entry_2 root_dir_dentry;
             root_dir_dentry.inode = root_inode_number;
@@ -561,22 +566,22 @@ BOOL out_inode_table_init()
                 printf("\n\n%d, %d\n\n", inode_number, root_inode_number);
 
                 // 向磁盘写入inode节点
-                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(inode_number - 1), SEEK_SET);
+                fseek(disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(inode_number - 1), SEEK_SET);
                 fwrite(&root_disk, OUT_INODE_LENGTH, 1, disk);
-                fseek(disk, FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(root_inode_number - 1), SEEK_SET);
+                fseek(disk, HOME_LENGTH + FIRST_INODE_BLOCK*EVERY_BLOCK + OUT_INODE_LENGTH*(root_inode_number - 1), SEEK_SET);
                 fwrite(&root_dir, OUT_INODE_LENGTH, 1, disk);
                 
                 // 向磁盘写入根目录的dentry目录
-                fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK, SEEK_SET);
+                fseek(disk, HOME_LENGTH + FIRST_DATA_BLOCK*EVERY_BLOCK, SEEK_SET);
                 fwrite(&root_disk_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
-                fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
+                fseek(disk, HOME_LENGTH + FIRST_DATA_BLOCK*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_disk_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
-                fseek(disk, FIRST_DATA_BLOCK*EVERY_BLOCK + 2*DIR_DENTRY_LENGTH, SEEK_SET);
+                fseek(disk, HOME_LENGTH + FIRST_DATA_BLOCK*EVERY_BLOCK + 2*DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_dir_dentry, DIR_DENTRY_LENGTH, 1, disk);
                 // 向磁盘写入root目录的dentry目录
-                fseek(disk, (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK, SEEK_SET);
+                fseek(disk, HOME_LENGTH + (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK, SEEK_SET);
                 fwrite(&root_dir_dentry_one_dot, DIR_DENTRY_LENGTH, 1, disk);
-                fseek(disk, (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
+                fseek(disk, HOME_LENGTH + (FIRST_DATA_BLOCK + 1)*EVERY_BLOCK + DIR_DENTRY_LENGTH, SEEK_SET);
                 fwrite(&root_dir_dentry_another_dot, DIR_DENTRY_LENGTH, 1, disk);
 
                 // 设置数据块被占用的标志

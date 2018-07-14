@@ -11,7 +11,7 @@ BOOL createFile(char* filename, __u8 type, char* current);
 BOOL deleteFile(char* filename, char* current);
 
 // 列出此目录下的所有文件
-BOOL selectFile(char* filename, char* current);
+BOOL selectFile(char* current);
 
 // 打开文件
 BOOL openFile(char* filename, char* current);
